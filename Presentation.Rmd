@@ -445,6 +445,7 @@ print(ggplot(data = one, mapping = aes( x = street, y = stars))+ ylim(1, 5)
       + ylab("Star Rating") 
       + geom_boxplot(), vp = vp2)
 ```
+The boxplot and scatterplot show that the presence of street parking has a correlation with a higher star rating.
 
 ## Star Rating vs. Validated Parking
 ```{r}
@@ -469,6 +470,9 @@ print(ggplot(data = one_vp, mapping = aes( x = validated, y = stars))+ ylim(1, 5
       + geom_boxplot(), vp = vp4)
 
 ```
+
+Though there are few businesses with validated parking, the trend does show that businesses with validated parking have higher ratings than those without.
+
 
 ## Star Rating vs. Good For Kids
 ```{r}
@@ -495,9 +499,9 @@ print(ggplot(data = one_gfk, mapping = aes( x = GoodForKids, y = stars))
       + ylim(1, 5)
       + geom_boxplot(), vp = vp6)
 
-
-
 ```
+From these plots, we see that there is somewhat of a trend between the presence of the attribute and the star rating of a business. This might mean that having higher reviews depend on whether the business has street parking, validated parking, and provides a good environment for kids, but does not necessarily mean that the presence of any of these attributes guarentees a higher star rating. 
+
 
 ##Star Rating vs WheelchairAccessible
 ```{r}
