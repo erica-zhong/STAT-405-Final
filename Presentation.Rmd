@@ -200,6 +200,132 @@ Two Word Clouds
 ## Predicting Using Individual Attributes
 
 
+##Killer Plot
+```{r}
+library(grid)
+library(gridBase)
+grid.newpage()
+text_color = "white"
+
+vp.1 <- viewport(x = 0, y = 0.5, w = 0.5, h = 0.5,
+                just = c("left", "bottom"))
+
+pushViewport(vp.1)
+
+Negative_Attributes1 = c("no parking","","never","time","","people", "","","","staff","back","dislike","terrible","","")
+
+s_x =c(0.9,0.91,0.9,0.91,0.85,0.83,0.81,0.79,0.78,0.77,0.69,0.64,0.6,0.62,0.61)
+s_y = c(0.8,0.75,0.7,0.65,0.7,0.69,0.68,0.55,0.5,0.45,0.43,0.42,0.46,0.48,0.53)
+grid.rect(gp = gpar(fill = "black"))
+
+for (i in 1:length(Negative_Attributes1)) {
+  if (Negative_Attributes1[i] != ""){
+    grid.circle(x = s_x[i], y = s_y[i], r = 0.01,gp=gpar(fill = "yellow"))
+  }
+  
+  grid.text(Negative_Attributes1[i], x = s_x[i], y = s_y[i] + 0.02,gp = gpar(fontsize = 8, fontface = "bold",col = text_color))
+}
+
+#Scorpio (negative)
+grid.lines(x = c(0.9,0.91,0.9,0.91), y = c(0.8,0.75,0.7,0.65), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+grid.lines(x = c(0.91,0.85,0.83,0.81,0.79,0.78,0.77,0.69,0.64,0.6,0.62,0.61), y = c(0.75,0.7,0.69,0.68,0.55,0.5,0.45,0.43,0.42,0.46,0.48,0.53), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+Negative_Attributes2 = c("","","poor","","food","","service","","","","Accepts Credit Card","","","","")
+#Cetus (negative)
+
+c_x = c(0.5,0.45,0.4,0.42,0.47,0.45,0.52,0.59,0.62,0.55,0.65,0.69,0.75,0.81)
+c_y = c(0.4,0.45,0.4,0.35,0.36,0.3,0.27,0.26,0.18,0.12,0.26,0.23,0.12,0.24)
+
+for (i in 1:length(Negative_Attributes2)) {
+  if (Negative_Attributes2[i] != ""){
+    grid.circle(x = c_x[i], y = c_y[i], r = 0.01,gp=gpar(fill = "yellow"))
+  }
+  grid.text(Negative_Attributes2[i], x = c_x[i], y = c_y[i] + 0.02, gp = gpar(fontsize = 8, fontface = "bold", col = text_color))
+}
+
+grid.lines(x = c(0.5,0.45,0.4,0.42,0.47,0.5), y = c(0.4,0.45,0.4,0.35,0.36,0.4), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+grid.lines(x = c(0.42, 0.45,0.52,0.59,0.62,0.55),y = c(0.35,0.3,0.27,0.26,0.18,0.12), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+grid.lines(x= c(0.59,0.65,0.69,0.75,0.81,0.69), y = c(0.26,0.26,0.23,0.12,0.24,0.23),gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+
+Positive_Attributes1 = c("service","validated parking","","No credit Card","","","friendly","","", "staff","")
+
+#Perseus (positive)
+
+per_x = c(0.1,0.04,0.03,0.02,0.01,0.01,0.03,0.04,0.1,0.14,0.18) + 0.07
+per_y = c(0.8,0.75,0.65,0.55,0.45,0.3,0.2,0.24,0.55,0.45,0.48)
+
+for (i in 1:length(Positive_Attributes1)) {
+  if (Positive_Attributes1[i] != ""){
+    grid.circle(x = per_x[i], y = per_y[i], r = 0.01,gp=gpar(fill = "yellow"))
+  }
+  grid.text(Positive_Attributes1[i], x = per_x[i], y = per_y[i] + 0.02,gp = gpar(fontsize = 8, fontface = "bold",col = text_color))
+}
+
+grid.lines(x= c(0.1,0.04,0.03,0.02,0.01,0.01,0.03,0.04) + 0.07,y=c(0.8,0.75,0.65,0.55,0.45,0.3,0.2,0.24),gp = gpar(col = rgb(1,1,0,0.5),lwd = 2))
+
+grid.lines(x = c(0.02,0.1,0.14,0.18) + 0.07, y = c(0.55,0.55,0.45,0.48),gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+#Hercule(positive)
+Positive_Attributes2 = c("love","amazing","","valet","","street parking","","","","garage","","","")
+h_x = c(0.43,0.38,0.35,0.38,0.40,0.32,0.32,0.31,0.25,0.26,0.27,0.23,0.20)
+h_y = c(0.9,0.83,0.76,0.68,0.60,0.50,0.63,0.73,0.74,0.88,0.55,0.62,0.62)
+
+for (i in 1:length(Positive_Attributes2)) {
+  if (Positive_Attributes2[i] != ""){
+    grid.circle(x = h_x[i], y = h_y[i], r = 0.01,gp=gpar(fill = "yellow"))
+  }
+  grid.text(Positive_Attributes2[i], x = h_x[i], y = h_y[i] + 0.02,gp = gpar(fontsize = 8, fontface = "bold",col = text_color))
+}
+
+grid.lines(x = c(0.43,0.38,0.35,0.38,0.40,0.32), y = c(0.9,0.83,0.76,0.68,0.60,0.50), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+grid.lines(x = c(0.26,0.25,0.31,0.32,0.27,0.23,0.20), y = c(0.88,0.74,0.73,0.63,0.55,0.62,0.62), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+grid.lines(x = c(0.31,0.35), y = c(0.73,0.76), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+grid.lines(x = c(0.32,0.38), y = c(0.63,0.68),gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+Neutral_Attributes1 = c("HasTV","child-friendly","","reservation","","latenight")
+
+#Lyra (neutral)
+l_x = c(0.76,0.8,0.73,0.64,0.58,0.66)
+l_y = c(0.9,0.83,0.8,0.8,0.7,0.7)
+
+for (i in 1:length(Neutral_Attributes1)) {
+  if (Neutral_Attributes1[i] != ""){
+    grid.circle(x = l_x[i], y = l_y[i], r = 0.01,gp=gpar(fill = "yellow"))
+  }
+  grid.text(Neutral_Attributes1[i], x = l_x[i], y = l_y[i] + 0.02, gp = gpar(fontsize = 8, fontface = "bold",col = text_color))
+}
+
+grid.lines(x = c(0.76,0.8,0.73,0.76),y = c(0.9,0.83,0.8,0.9),gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+grid.lines(x = c(0.64,0.58,0.66,0.73,0.64), y = c(0.8,0.7,0.7,0.8,0.8), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+
+#Microscopium (neutral)
+Neutral_Attributes2 = c("","staff", "", "Wheelchair Accessible", "","Outdoor Seating")
+m_x = c(0.24,0.3,0.35,0.35,0.24)
+m_y = c(0.3,0.3,0.25,0.1,0.15)
+
+for (i in 1:length(Neutral_Attributes2)){
+  if (Neutral_Attributes2[i] != ""){
+    grid.circle(x = m_x[i], y = m_y[i], r = 0.01, gp=gpar(fill = "yellow"))
+  }
+  grid.text(Neutral_Attributes2[i],x=m_x[i], y=m_y[i] + 0.02 ,gp = gpar(fontsize = 8, fontface = "bold",col = text_color))
+}
+
+grid.lines(x = c(0.24,0.3,0.35,0.35,0.24,0.24), y = c(0.3,0.3,0.25,0.1,0.15,0.3), gp = gpar(col = rgb(1,1,0,0.5), lwd = 2))
+
+
+grid.text("Constellation of Attributes", y = unit(20.5,"lines"), gp=gpar(fontsize=10, col="white", fontface = "italic"))
+
+
+popViewport()
+```
+
 
 
 
