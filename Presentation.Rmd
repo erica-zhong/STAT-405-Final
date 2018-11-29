@@ -1,5 +1,5 @@
 ---
-title: "Presentation"
+title: "Exploration of Yelp businesses and reviews with a focus on attributes that make restaurants good"
 author: "Jungwoo Lee, Andy Lu, Jay Shi, Erica Zhong"
 date: "November 29, 2018"
 output:
@@ -14,7 +14,7 @@ knitr::opts_chunk$set(error = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
 
-```{r, error=FALSE, warning=FALSE}
+```{r, error=FALSE, warning=FALSE, include=FALSE}
 library(jsonlite)
 library(ggplot2)
 library(knitr)
@@ -54,7 +54,7 @@ plot.subtitle = element_text(size = 10, colour = "#2f2f63"))
 
 ```
 
-```{r}
+```{r, include=FALSE}
 setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
 businesses <- read.csv("yelp_academic_dataset_business.csv", header = TRUE)
 head(businesses)
@@ -77,18 +77,16 @@ att <- head(businesses$attributes)
 - 16 columns
 
 ## Central Question
-How can we predict Yelp business star ratings based on business attributes?
-Is there a way to gain higher ratings through intentional inclusion of attributes?
+> - How can we predict Yelp business star ratings based on business attributes?
+> - Is there a way to gain higher ratings through intentional inclusion of attributes?
 
 ## Distribution of Ratings
-
 ```{r}
 ggplot(businesses, aes(x = stars)) + geom_bar(stat = "count", fill = "chocolate") + 
   ggtitle("Distribution of Aggregate Ratings of Businesses") +
   xlab("Ratings") +
   ylab("Frequency")
 ```
-
 
 ## Distribution of Businesses Across States
 ```{r}
@@ -98,9 +96,7 @@ top10States['Others'] <- otherStates
 barplot(as.vector(top10States), names.arg = attr(top10States, "names"), main = "Number of Businesses Per State/Province", xlab = "State/Province", ylab = "Count", col = cbPalette)
 ```
 
-
 ## Distribution of Review Counts
-
 ```{r}
 grid.newpage()
 a <- ggplot(businesses) + aes(x = review_count) + geom_bar(fill = "salmon") + 
@@ -121,7 +117,6 @@ print(b, vp = vpb)
 ```
 
 ## Average Rating Across Categories
-
 ```{r}
 BusiData <- as.data.frame(businesses)
 Categories = c("Food", "Barbers", "Home Services", "Health", "Shopping", "Restaurants", "Nightlife", "Bars")
@@ -162,7 +157,6 @@ ggplot(avg_stars) +
   ylab("Average Ratings")
 ```
 
-
 ## Comparison Between Restaurants and Non-Restaurants
 ```{r}
 total <- select(businesses, categories, stars)
@@ -185,7 +179,7 @@ print(rest, vp = vpr)
 print(nonrest, vp = vpnr)
 ```
 
-## Yelp vs. TripAdvisor
+## TripAdvisor Most Frequent Words
 ```{r}
 setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
 dcon <- dbConnect(SQLite(), dbname = "yelp.db")
@@ -198,7 +192,6 @@ WHERE business_id = '4JNXUYY8wbaaDmk3BPzlWw'
 
 reviews <- dbFetch(res, -1)
 dbClearResult(res)
-
 createWordCloud = function(train)
 {
   word <- train %>%
@@ -225,7 +218,7 @@ colnames(trip_reviews) <- cols
 createWordCloud(trip_reviews)  
 ```
 
-## 2nd Word Cloud
+## Yelp Most Frequent Words
 ```{r}
 createWordCloud(reviews)
 dbDisconnect(dcon)
@@ -236,16 +229,14 @@ dbDisconnect(dcon)
 - 20 attributes used to predict star rating of a restaurant
 - Trained data on 80% of data, tested on 20%
 - k = 5 neighbors
-# In simple terms, the k nearest neighbours algorithm is an algorithm that works based on a similarity concept. That is, for any new data point to be predicted based on an existing data set, if the majority of “k” neighbours of the new point belong to a particular class, then the new point also belongs to that class.
 
 ## Predicting Using All Attributes
 - Accuracy = 57.58%.
 
 
 ## Predicting Using Individual Attributes
-
-#Prereq for these plots:
-```{r}
+Prereq for these plots:
+```{r, include = FALSE}
 setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
 library(RSQLite)
 library(data.table)
@@ -258,14 +249,14 @@ library(grid)
 library(gridBase)
 dcon <- dbConnect(SQLite(), dbname = "yelp.db")
 res <- dbSendQuery(conn = dcon, "
-SELECT * FROM business LIMIT 35000;
+SELECT * FROM business LIMIT 35;
 ")
 df <- dbFetch(res, -1)
 dbClearResult(res)
 ```
 
 Function to extract the attributes and prepare a dataframe for model training. 
-```{r}
+```{r, include=FALSE}
 get_training_df <- function(df, orig_cols, attr_cols) {
   # Input:
   # 1) df - raw business dataframe queried using SQL
@@ -344,9 +335,8 @@ get_training_df <- function(df, orig_cols, attr_cols) {
 }
 ```
 
-
 The attributes are listed in the character vector below. 
-```{r}
+```{r, include=FALSE}
 orig_cols <-  c("stars")
 attr_cols <- c("BusinessAcceptsCreditCards",
                "garage",
@@ -369,11 +359,10 @@ attr_cols <- c("BusinessAcceptsCreditCards",
                "RestaurantsTableService", 
                "WheelchairAccessible")
 training_df <- get_training_df(df, orig_cols, attr_cols)
-# wifi free = 1 // Alcohol none = 1
 ```
 
 Set up for all models. If a business does not include a star rating, it is removed from the dataset. The predicted value of the star rating, as well as the actual star rating of a business is rounded to the nearest whole number, for simplicity.
-```{r}
+```{r, include = FALSE}
 funct <- function(a) {  
     return(round(a))
 }
@@ -386,7 +375,7 @@ Test <- Test[!is.na(Test$stars),]
 
 ## Model with All Attributes
 If a business does not include any attribute, it is removed from the dataset.
-```{r}
+```{r, include = FALSE}
 Train_All <- na.omit(Train)
 Test_All <- na.omit(Test)
 studentModel <- train(stars ~ ., data=Train_All, method = "knn")
@@ -401,7 +390,7 @@ Here, we use all the attributes listed to predict the star rating of a business 
 
 ## Individual Attributes
 If a business does not include the specified attribute we are training on, it is removed from the dataset.
-```{r}
+```{r, include = FALSE}
 attribute <- function(att) {
   Train2 <- Train[!is.na(Train[att]),]
   Test2 <- Test[!is.na(Test[att]),]
@@ -467,9 +456,7 @@ ca
 ```
 Now, we will try combinations of attributes to see if a certain combination can be used to train a model with a higher accuracy. Here, we obtained the best accuracy of 69.23% using both GoodForKids and street or validated parking. 
 
-
-
-##Star Ratings vs a bunch of attributes: 
+##Star Ratings vs Street Parking
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = street)) + geom_jitter(aes(colour = stars))
 SP <- training_df[!is.na(training_df$stars),]
@@ -477,7 +464,10 @@ SP <- SP[!is.na(SP$street),]
 
 zero <- subset(SP, SP$street == 0)  
 one <- subset(SP, SP$street == 1)  
+```
 
+##Star Ratings vs. Street Parking
+```{r}
 grid.newpage()
 vp1 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero, mapping = aes( x = street, y = stars)) + ylim(1, 5)
@@ -491,7 +481,7 @@ print(ggplot(data = one, mapping = aes( x = street, y = stars))+ ylim(1, 5)
       + ylab("Star Rating") 
       + geom_boxplot(), vp = vp2)
 ```
-The boxplot and scatterplot show that the presence of street parking has a correlation with a higher star rating.
+<font size="3">The boxplot and scatterplot show that the presence of street parking has a correlation with a higher star rating.</font>
 
 ## Star Rating vs. Validated Parking
 ```{r}
@@ -502,6 +492,10 @@ VP <- VP[!is.na(VP$validated),]
 zero_vp <- subset(VP, VP$validated == 0)  
 one_vp <- subset(VP, VP$validated == 1)  
 
+```
+
+## Star Rating vs. Validated Parking
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = validated, y = stars)) 
@@ -516,9 +510,7 @@ print(ggplot(data = one_vp, mapping = aes( x = validated, y = stars))+ ylim(1, 5
       + geom_boxplot(), vp = vp4)
 
 ```
-
-Though there are few businesses with validated parking, the trend does show that businesses with validated parking have higher ratings than those without.
-
+<font size="3">Though there are few businesses with validated parking, the trend does show that businesses with validated parking have higher ratings than those without.</font>
 
 ## Star Rating vs. Good For Kids
 ```{r}
@@ -529,7 +521,10 @@ GFK <- GFK[!is.na(GFK$GoodForKids),]
 
 zero_gfk <- subset(GFK, GFK$GoodForKids == 0)  
 one_gfk <- subset(GFK, GFK$GoodForKids == 1)  
+```
 
+## Star Rating vs. Good For Kids
+```{r}
 grid.newpage()
 vp5 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_gfk, mapping = aes( x = GoodForKids, y = stars)) 
@@ -546,10 +541,9 @@ print(ggplot(data = one_gfk, mapping = aes( x = GoodForKids, y = stars))
       + geom_boxplot(), vp = vp6)
 
 ```
-From these plots, we see that there is somewhat of a trend between the presence of the attribute and the star rating of a business. This might mean that having higher reviews depend on whether the business has street parking, validated parking, and provides a good environment for kids, but does not necessarily mean that the presence of any of these attributes guarentees a higher star rating. 
+<font size="3">From these plots, we see that there is somewhat of a trend between the presence of the attribute and the star rating of a business (correlation). However, this does not necessarily mean that the presence of any of these attributes guarentees a higher star rating (causation).</font>
 
-
-##Star Rating vs WheelchairAccessible
+##Star Rating vs Wheelchair Accessible
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = WheelchairAccessible)) + geom_jitter(aes(colour = stars))
 VP <- training_df[!is.na(training_df$stars),]
@@ -557,7 +551,10 @@ VP <- VP[!is.na(VP$WheelchairAccessible),]
 
 zero_vp <- subset(VP, VP$WheelchairAccessible == 0)  
 one_vp <- subset(VP, VP$WheelchairAccessible == 1)  
+```
 
+##Star Rating vs. Wheelchair Accessible
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = WheelchairAccessible, y = stars)) + ylim(1,5)
@@ -581,6 +578,10 @@ VP <- VP[!is.na(VP$BusinessAcceptsCreditCards),]
 zero_vp <- subset(VP, VP$BusinessAcceptsCreditCards == 0)  
 one_vp <- subset(VP, VP$BusinessAcceptsCreditCards == 1)  
 
+```
+
+##Star Rating vs. Credit Cards
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = BusinessAcceptsCreditCards, y = stars)) + ylim(1,5)
@@ -604,7 +605,10 @@ VP <- VP[!is.na(VP$OutdoorSeating),]
 
 zero_vp <- subset(VP, VP$OutdoorSeating == 0)  
 one_vp <- subset(VP, VP$OutdoorSeating == 1)  
+```
 
+##Star Rating vs. Outdoor Seating
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = OutdoorSeating, y = stars)) + ylim(1,5)
@@ -622,7 +626,7 @@ print(ggplot(data = one_vp, mapping = aes( x = OutdoorSeating, y = stars))+ ylim
 
 ```
 
-#Star Rating vs Reservation
+##Star Rating vs Reservation
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = RestaurantsReservations)) + geom_jitter(aes(colour = stars))
 VP <- training_df[!is.na(training_df$stars),]
@@ -631,6 +635,10 @@ VP <- VP[!is.na(VP$RestaurantsReservations),]
 zero_vp <- subset(VP, VP$RestaurantsReservations == 0)  
 one_vp <- subset(VP, VP$RestaurantsReservations == 1)  
 
+```
+
+##Star Rating vs. Reservation
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = RestaurantsReservations, y = stars)) + ylim(1,5)
@@ -646,7 +654,7 @@ print(ggplot(data = one_vp, mapping = aes( x = RestaurantsReservations, y = star
 
 ```
 
-#Star Rating vs Has TV
+##Star Rating vs Has TV
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = HasTV)) + geom_jitter(aes(colour = stars))
 VP <- training_df[!is.na(training_df$stars),]
@@ -654,7 +662,10 @@ VP <- VP[!is.na(VP$HasTV),]
 
 zero_vp <- subset(VP, VP$HasTV == 0)  
 one_vp <- subset(VP, VP$HasTV == 1)  
+```
 
+##Star Rating vs. Has TV
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = HasTV, y = stars)) + ylim(1,5)
@@ -670,7 +681,7 @@ print(ggplot(data = one_vp, mapping = aes( x = HasTV, y = stars))+ ylim(1, 5)
 
 ```
 
-#Star Rating vs Valet
+##Star Rating vs Valet
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = valet)) + geom_jitter(aes(colour = stars))
 VP <- training_df[!is.na(training_df$stars),]
@@ -678,7 +689,10 @@ VP <- VP[!is.na(VP$valet),]
 
 zero_vp <- subset(VP, VP$valet == 0)  
 one_vp <- subset(VP, VP$valet == 1)  
+```
 
+##Star Rating vs. Valet
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes(x = valet, y = stars)) + ylim(1,5)
@@ -694,7 +708,7 @@ print(ggplot(data = one_vp, mapping = aes(x = valet, y = stars))+ ylim(1, 5)
 
 ```
 
-#Star Rating vs Late Night 
+##Star Rating vs Late Night 
 ```{r}
 ggplot(data = training_df, mapping = aes(x = stars, y = latenight)) + geom_jitter(aes(colour = stars))
 VP <- training_df[!is.na(training_df$stars),]
@@ -702,7 +716,10 @@ VP <- VP[!is.na(VP$latenight),]
 
 zero_vp <- subset(VP, VP$latenight == 0)  
 one_vp <- subset(VP, VP$latenight == 1)  
+```
 
+##Star Rating vs. Late Night
+```{r}
 grid.newpage()
 vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
 print(ggplot(data = zero_vp, mapping = aes( x = latenight, y = stars)) + ylim(1,5)
@@ -722,10 +739,12 @@ print(ggplot(data = one_vp, mapping = aes( x = latenight, y = stars))+ ylim(1, 5
 ```{r}
 library(grid)
 library(gridBase)
+
+
 grid.newpage()
 text_color = "white"
 
-vp.1 <- viewport(x = 0, y = 0.5, w = 0.5, h = 0.5,
+vp.1 <- viewport(x = 0, y = 0, w = 1, h = 1,
                 just = c("left", "bottom"))
 
 pushViewport(vp.1)
@@ -844,10 +863,11 @@ grid.text("Constellation of Attributes", y = unit(20.5,"lines"), gp=gpar(fontsiz
 popViewport()
 ```
 
-
 ## Analysis
-
-
+?? What goes here
 
 ## Conclusion
+- Restaurants reviews are pickier than non-restaurants reviews (less 5 star ratings).
+- Differences between the reviews of Yelp and TripAdvisor and how Yelp focuses more on actual food items while TripAdvisor focuses more on the experience as a whole.
+- Through our kNN classifier, ... ?????????????/ Idk write some stuff here 
 
