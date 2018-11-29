@@ -3,8 +3,8 @@ title: "Presentation"
 author: "Jungwoo Lee, Andy Lu, Jay Shi, Erica Zhong"
 date: "November 29, 2018"
 output:
-  beamer_presentation: default
   ioslides_presentation: default
+  beamer_presentation: default
   slidy_presentation: default
 ---
 
@@ -55,6 +55,7 @@ plot.subtitle = element_text(size = 10, colour = "#2f2f63"))
 ```
 
 ```{r}
+setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
 businesses <- read.csv("yelp_academic_dataset_business.csv", header = TRUE)
 head(businesses)
 nrow(businesses)
@@ -79,7 +80,7 @@ att <- head(businesses$attributes)
 How can we predict Yelp business star ratings based on business attributes?
 Is there a way to gain higher ratings through intentional inclusion of attributes?
 
-## Distribution of Ratings s
+## Distribution of Ratings
 
 ```{r}
 ggplot(businesses, aes(x = stars)) + geom_bar(stat = "count", fill = "chocolate") + 
@@ -136,28 +137,6 @@ ggplot(data.frame(Categories), aes(x = Categories, y = Ave_Review, fill = Catego
 
 ```
 
-## Comparison Between Restaurants and Non-Restaurants
-```{r}
-total <- select(businesses, categories, stars)
-restaurantsOnly <- filter(total, str_detect(categories, 'Restaurants'))
-notRestaurants <- setdiff(total, restaurantsOnly)
-
-rest <- ggplot(notRestaurants) + aes(x = stars) + geom_bar(fill = "#ABCDEF") +
-  ggtitle("Distribution of Aggregate Ratings of Non-restaurants") +
-  xlab("Ratings") +
-  ylab("Frequency")
-
-nonrest <- ggplot(restaurantsOnly) + aes(x = stars) + geom_bar(fill = "#FF6666") +
-  ggtitle("Distribution of Aggregate Ratings of Restaurants") +
-  xlab("Ratings") +
-  ylab("Frequency")
-grid.newpage()
-vpr <- viewport(x = 0.5, y = 0.75, width = 1, height = 0.5)
-vpnr <- viewport(x = 0.5, y = 0.25, width = 1, height = 0.5)
-print(rest, vp = vpr)
-print(nonrest, vp = vpnr)
-```
-
 ## Average Rating Across States
 ```{r}
 stateStars <- select(
@@ -183,8 +162,74 @@ ggplot(avg_stars) +
   ylab("Average Ratings")
 ```
 
+
+## Comparison Between Restaurants and Non-Restaurants
+```{r}
+total <- select(businesses, categories, stars)
+restaurantsOnly <- filter(total, str_detect(categories, 'Restaurants'))
+notRestaurants <- setdiff(total, restaurantsOnly)
+
+rest <- ggplot(notRestaurants) + aes(x = stars) + geom_bar(fill = "#ABCDEF") +
+  ggtitle("Distribution of Aggregate Ratings of Non-restaurants") +
+  xlab("Ratings") +
+  ylab("Frequency")
+
+nonrest <- ggplot(restaurantsOnly) + aes(x = stars) + geom_bar(fill = "#FF6666") +
+  ggtitle("Distribution of Aggregate Ratings of Restaurants") +
+  xlab("Ratings") +
+  ylab("Frequency")
+grid.newpage()
+vpr <- viewport(x = 0.5, y = 0.75, width = 1, height = 0.5)
+vpnr <- viewport(x = 0.5, y = 0.25, width = 1, height = 0.5)
+print(rest, vp = vpr)
+print(nonrest, vp = vpnr)
+```
+
 ## Yelp vs. TripAdvisor
-Two Word Clouds
+```{r}
+setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
+dcon <- dbConnect(SQLite(), dbname = "yelp.db")
+
+res <- dbSendQuery(conn = dcon, "
+SELECT * 
+FROM review
+WHERE business_id = '4JNXUYY8wbaaDmk3BPzlWw'
+")
+
+reviews <- dbFetch(res, -1)
+dbClearResult(res)
+
+createWordCloud = function(train)
+{
+  word <- train %>%
+  unnest_tokens_('word', 'text')
+  
+  word <- word %>% filter(!word %in% stop_words$word) %>%
+  count(word,sort = TRUE) %>%
+  ungroup()  %>%
+  head(30) %>%
+  
+  with(wordcloud(word, n, max.words = 30,colors=brewer.pal(8, "Dark2")))
+}
+
+reviews <- data.frame(reviews)
+res <- dbSendQuery(conn = dcon, "
+SELECT * 
+FROM scrapedReview
+")
+trip_reviews <- dbFetch(res, -1)
+dbClearResult(res)
+trip_reviews <- data.frame(trip_reviews)
+cols <- c("text")
+colnames(trip_reviews) <- cols
+createWordCloud(trip_reviews)  
+```
+
+## 2nd Word Cloud
+```{r}
+createWordCloud(reviews)
+dbDisconnect(dcon)
+```
 
 ## Model
 - kNN Model
@@ -201,6 +246,7 @@ Two Word Clouds
 
 #Prereq for these plots:
 ```{r}
+setwd("/Users/ericazhong/Documents/Rice 2018-2019/STAT 405")
 library(RSQLite)
 library(data.table)
 library(stringr)
@@ -799,10 +845,7 @@ popViewport()
 ```
 
 
-
-
-
-
+## Analysis
 
 
 
