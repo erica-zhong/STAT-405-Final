@@ -199,6 +199,474 @@ Two Word Clouds
 
 ## Predicting Using Individual Attributes
 
+#Prereq for these plots:
+```{r}
+library(RSQLite)
+library(data.table)
+library(stringr)
+library(rlang)
+library(caret)
+library(dplyr)
+library(tidyverse)
+library(grid)
+library(gridBase)
+dcon <- dbConnect(SQLite(), dbname = "yelp.db")
+res <- dbSendQuery(conn = dcon, "
+SELECT * FROM business LIMIT 35000;
+")
+df <- dbFetch(res, -1)
+dbClearResult(res)
+```
+
+Function to extract the attributes and prepare a dataframe for model training. 
+```{r}
+get_training_df <- function(df, orig_cols, attr_cols) {
+  # Input:
+  # 1) df - raw business dataframe queried using SQL
+  # 2) orig_cols - vector of features you want to include in the output dataframe
+  #                that are existing column names of the input dataframe
+  # 3) attr_cols - vector of features you want to include in the output dataframe
+  #                that need to be extracted from the "attributes" column
+  #                of the input dataframe
+  # Output: a dataframe ready for training
+  # Note: 1) rows that do not contain any feature
+  #          in the two input vectors will not be included in the output
+  #       2) attr_cols only supports boolean features
+  
+  # initialize result dataframe
+  col_names <-  c(orig_cols, attr_cols)
+  result <- data.frame()
+  
+  for (col in col_names) {
+    result[1, col] <- NA
+  }
+  
+  empty_row <- copy(result)
+  
+  row_extract <- function(row) {
+    # Input: a single row of the input dataframe
+    # Output: a new single row with all the features
+    #         that needs to be added to the result dataframe
+    new_row <- copy(empty_row)
+    #new_row[1, "name"] <- row[1, "name"]
+    
+    for (col in orig_cols) {
+      val <- row[1, col]
+      
+      # if this entry of the row in input dafaframe is empty string,
+      # the business corresponding to this row will not be included
+      # in the output dataframe
+      new_row[1, col] <- ifelse(length(val) != 0, val, NA)
+    }
+    
+    # extract all True/False
+    values <- str_extract(
+      row$attributes[1],
+      paste0(
+        "(?<='?",
+        attr_cols,
+        "'?(?:\\s)?[:=]\\s\\\"?)(True|False)"
+      )
+    )
+    
+    for (index in 1:length(attr_cols)) {
+      attr <- attr_cols[index]
+      str <- values[index]
+
+      if (is.na(str)) {
+        new_row[1, attr] <- NA
+      } else if (str == "True") {
+        new_row[1, attr] <- 1
+      } else if (str == "False") {
+        new_row[1, attr] <- 0
+      } else {
+        new_row[1, attr] <- 0
+      }
+    }
+    return (new_row)
+  }
+  
+  # stacks up all new rows
+  for (row in 1:nrow(df)) {
+    result <- rbind(result, row_extract(df[row, ]))
+  }
+  
+  # drops all rows that contain NA
+  # result <- na.omit(result)
+  rownames(result) <- 1:nrow(result)
+  return (result)
+}
+```
+
+
+The attributes are listed in the character vector below. 
+```{r}
+orig_cols <-  c("stars")
+attr_cols <- c("BusinessAcceptsCreditCards",
+               "garage",
+               "street", 
+               "validated",
+               "lot", 
+               "valet", 
+               "Caters",
+               "GoodForKids",
+               "dessert",
+               "latenight", 
+               "lunch", 
+               "dinner", 
+               "breakfast",
+               "brunch", 
+               "HasTV", 
+               "OutdoorSeating", 
+               "RestaurantsGoodForGroups",
+               "RestaurantsReservations",
+               "RestaurantsTableService", 
+               "WheelchairAccessible")
+training_df <- get_training_df(df, orig_cols, attr_cols)
+# wifi free = 1 // Alcohol none = 1
+```
+
+Set up for all models. If a business does not include a star rating, it is removed from the dataset. The predicted value of the star rating, as well as the actual star rating of a business is rounded to the nearest whole number, for simplicity.
+```{r}
+funct <- function(a) {  
+    return(round(a))
+}
+
+Train = head(training_df, 0.8 * nrow(training_df))
+Test = tail(training_df, 0.2 * nrow(training_df))
+Train <- Train[!is.na(Train$stars),]
+Test <- Test[!is.na(Test$stars),]
+```
+
+## Model with All Attributes
+If a business does not include any attribute, it is removed from the dataset.
+```{r}
+Train_All <- na.omit(Train)
+Test_All <- na.omit(Test)
+studentModel <- train(stars ~ ., data=Train_All, method = "knn")
+studentTestPred <- predict(studentModel, Test_All)
+studentTestPred = sapply(studentTestPred, funct)
+Actual = sapply(Test_All$stars, funct)
+
+confusionMatrix(factor(studentTestPred, levels = 1:5), 
+                factor(Actual, levels = 1:5))$overall['Accuracy']
+```
+Here, we use all the attributes listed to predict the star rating of a business and get an accuracy of 54.54%. 
+
+## Individual Attributes
+If a business does not include the specified attribute we are training on, it is removed from the dataset.
+```{r}
+attribute <- function(att) {
+  Train2 <- Train[!is.na(Train[att]),]
+  Test2 <- Test[!is.na(Test[att]),]
+  form <- as.formula(paste('stars ~', att))
+  studentModel <- train(form, data=Train2, method = "knn")
+  studentTestPred <- predict(studentModel, Test2)
+  studentTestPred = sapply(studentTestPred, funct)
+  Actual = sapply(Test2$stars, funct)
+  acc = confusionMatrix(factor(studentTestPred, levels = 1:5), factor(Actual, levels = 1:5))$overall['Accuracy']
+  # print(acc)
+}
+
+xd <- data.frame()
+xd[1, "Attribute"] <- NA
+xd[1, "Accuracy"] <- NA
+empty_row <- copy(xd)
+
+for (r in attr_cols) {
+  new_row <- copy(empty_row)
+  num = attribute(r)
+  new_row[1, "Attribute"] <- r
+  new_row[1, "Accuracy"] <- num
+  xd <- rbind(xd, new_row)
+}
+xd <- na.omit(xd)
+```
+Now, we use each of the attributes individually to predict the star rating of a business. The attribute with the best accuracy is GoodForKids at 0.6695652. This is better than using all of the attributes together. 
+
+## Combining Attributes
+If a business does not include either of the specified attributes we are training on, it is removed from the dataset.
+```{r}
+Train3 <- Train[!is.na(Train$GoodForKids),]
+Test3 <- Test[!is.na(Test$GoodForKids),]
+
+round3 <- function(att) {
+  Train4 <- Train3[!is.na(Train3[att]),]
+  Test4 <- Test3[!is.na(Test3[att]),]
+  form <- as.formula(paste('stars ~ GoodForKids + ', att))
+  studentModel <- train(form, data=Train4, method = "knn")
+  studentTestPred <- predict(studentModel, Test4)
+  studentTestPred = sapply(studentTestPred, funct)
+  Actual = sapply(Test4$stars, funct)
+  acc = confusionMatrix(factor(studentTestPred, levels = 1:5), factor(Actual, levels = 1:5))$overall['Accuracy']
+}
+comb = c("WheelchairAccessible", 
+         "garage", 
+         "street", 
+         "validated")
+ca <- data.frame()
+ca[1, "Attribute"] <- NA
+ca[1, "Accuracy"] <- NA
+empty_row <- copy(ca)
+
+for (r in comb) {
+  new_row <- copy(empty_row)
+  num = round3(r)
+  new_row[1, "Attribute"] <- r
+  new_row[1, "Accuracy"] <- num
+  ca <- rbind(ca, new_row)
+}
+ca <- na.omit(ca)
+ca
+```
+Now, we will try combinations of attributes to see if a certain combination can be used to train a model with a higher accuracy. Here, we obtained the best accuracy of 69.23% using both GoodForKids and street or validated parking. 
+
+
+
+##Star Ratings vs a bunch of attributes: 
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = street)) + geom_jitter(aes(colour = stars))
+SP <- training_df[!is.na(training_df$stars),]
+SP <- SP[!is.na(SP$street),]
+
+zero <- subset(SP, SP$street == 0)  
+one <- subset(SP, SP$street == 1)  
+
+grid.newpage()
+vp1 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero, mapping = aes( x = street, y = stars)) + ylim(1, 5)
+      + xlab("No Street Parking") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp1)
+
+vp2 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one, mapping = aes( x = street, y = stars))+ ylim(1, 5) 
+      + xlab("Street Parking") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp2)
+```
+
+## Star Rating vs. Validated Parking
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = validated)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$validated),]
+
+zero_vp <- subset(VP, VP$validated == 0)  
+one_vp <- subset(VP, VP$validated == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = validated, y = stars)) 
+      + xlab("No Validated Parking") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = validated, y = stars))+ ylim(1, 5) 
+      + xlab("Validated Parking") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
+
+## Star Rating vs. Good For Kids
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = GoodForKids)) + geom_jitter(aes(colour = stars))
+
+GFK <- training_df[!is.na(training_df$stars),]
+GFK <- GFK[!is.na(GFK$GoodForKids),]
+
+zero_gfk <- subset(GFK, GFK$GoodForKids == 0)  
+one_gfk <- subset(GFK, GFK$GoodForKids == 1)  
+
+grid.newpage()
+vp5 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_gfk, mapping = aes( x = GoodForKids, y = stars)) 
+      + xlab("Not Good For Kids") 
+      + ylab("Star Rating")
+      + ylim(1, 5) 
+      + geom_boxplot() , vp = vp5)
+
+vp6 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_gfk, mapping = aes( x = GoodForKids, y = stars))
+      + xlab("Good For Kids") 
+      + ylab("Star Rating") 
+      + ylim(1, 5)
+      + geom_boxplot(), vp = vp6)
+
+
+
+```
+
+##Star Rating vs WheelchairAccessible
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = WheelchairAccessible)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$WheelchairAccessible),]
+
+zero_vp <- subset(VP, VP$WheelchairAccessible == 0)  
+one_vp <- subset(VP, VP$WheelchairAccessible == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = WheelchairAccessible, y = stars)) + ylim(1,5)
+      + xlab("Not Wheelchair Accessible") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = WheelchairAccessible, y = stars))+ ylim(1, 5) 
+      + xlab("Wheelchair Accessible") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+```
+
+##Star Rating vs Credit Cards
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = BusinessAcceptsCreditCards)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$BusinessAcceptsCreditCards),]
+
+zero_vp <- subset(VP, VP$BusinessAcceptsCreditCards == 0)  
+one_vp <- subset(VP, VP$BusinessAcceptsCreditCards == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = BusinessAcceptsCreditCards, y = stars)) + ylim(1,5)
+      + xlab("Bussiness Does Not Accept Credit Cards") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = BusinessAcceptsCreditCards, y = stars))+ ylim(1, 5) 
+      + xlab("Bussiness Accepts Credit Cards") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
+
+##Star Rating vs Outdoor Seating
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = OutdoorSeating)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$OutdoorSeating),]
+
+zero_vp <- subset(VP, VP$OutdoorSeating == 0)  
+one_vp <- subset(VP, VP$OutdoorSeating == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = OutdoorSeating, y = stars)) + ylim(1,5)
+      + xlab("No Outdoor Seating") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = OutdoorSeating, y = stars))+ ylim(1, 5) 
+      + xlab("Has Outdoor Seating") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+
+
+```
+
+#Star Rating vs Reservation
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = RestaurantsReservations)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$RestaurantsReservations),]
+
+zero_vp <- subset(VP, VP$RestaurantsReservations == 0)  
+one_vp <- subset(VP, VP$RestaurantsReservations == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = RestaurantsReservations, y = stars)) + ylim(1,5)
+      + xlab("Does Not Accept Reservation") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = RestaurantsReservations, y = stars))+ ylim(1, 5) 
+      + xlab("Accepts Reservation") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
+
+#Star Rating vs Has TV
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = HasTV)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$HasTV),]
+
+zero_vp <- subset(VP, VP$HasTV == 0)  
+one_vp <- subset(VP, VP$HasTV == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = HasTV, y = stars)) + ylim(1,5)
+      + xlab("Does Not Have TV") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = HasTV, y = stars))+ ylim(1, 5) 
+      + xlab("Has TV") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
+
+#Star Rating vs Valet
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = valet)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$valet),]
+
+zero_vp <- subset(VP, VP$valet == 0)  
+one_vp <- subset(VP, VP$valet == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes(x = valet, y = stars)) + ylim(1,5)
+      + xlab("Does Not Have TV") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes(x = valet, y = stars))+ ylim(1, 5) 
+      + xlab("Has TV") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
+
+#Star Rating vs Late Night 
+```{r}
+ggplot(data = training_df, mapping = aes(x = stars, y = latenight)) + geom_jitter(aes(colour = stars))
+VP <- training_df[!is.na(training_df$stars),]
+VP <- VP[!is.na(VP$latenight),]
+
+zero_vp <- subset(VP, VP$latenight == 0)  
+one_vp <- subset(VP, VP$latenight == 1)  
+
+grid.newpage()
+vp3 <- viewport(x = 0.25, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = zero_vp, mapping = aes( x = latenight, y = stars)) + ylim(1,5)
+      + xlab("No latenight ") 
+      + ylab("Star Rating")
+      + geom_boxplot() , vp = vp3)
+
+vp4 <- viewport(x = 0.75, y = 0.5, width = 0.5, height = 1)
+print(ggplot(data = one_vp, mapping = aes( x = latenight, y = stars))+ ylim(1, 5) 
+      + xlab("Latenight") 
+      + ylab("Star Rating") 
+      + geom_boxplot(), vp = vp4)
+
+```
 
 ##Killer Plot
 ```{r}
