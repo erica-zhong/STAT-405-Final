@@ -1,0 +1,212 @@
+---
+title: "Presentation"
+author: "Jungwoo Lee, Andy Lu, Jay Shi, Erica Zhong"
+date: "November 29, 2018"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(error = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, error=FALSE, warning=FALSE}
+library(jsonlite)
+library(ggplot2)
+library(knitr)
+library(RSQLite)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(RSelenium)
+library(magrittr)
+library(janeaustenr)
+library(tidytext)
+library(jsonlite)
+library(dbplyr)
+library(ggplot2)
+library(knitr)
+library(RSQLite)
+library(stringr)
+library(dplyr)
+library(wordcloud)
+library(RColorBrewer)
+library(grid)
+library(gridBase)
+library(tm)
+library(RSQLite)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+"#F0E442", "#0072B2", "#D55E00", "#CC79A7","#6b3447")
+theme1 <- theme_bw() +
+theme(axis.text = element_text(size = 8, colour = "#6b3447"),
+axis.title = element_text(size = 10, colour = "#2f2f63"),
+legend.title = element_text(size = 8, colour = "#2f2f63"),
+legend.text = element_text(size = 8, colour = "#6b3447"),
+title = element_text(size = 12, colour = "#2f2f63"),
+axis.ticks = element_line(colour = "#6b3447"),
+plot.caption = element_text(size = 8, colour = "#2f2f63"),
+plot.subtitle = element_text(size = 10, colour = "#2f2f63"))
+
+```
+
+```{r}
+businesses <- read.csv("yelp_academic_dataset_business.csv", header = TRUE)
+head(businesses)
+nrow(businesses)
+ncol(businesses)
+att <- head(businesses$attributes)
+```
+
+## Key Aspects
+
+- Overview of Dataset
+- Introductory plots
+- Difference between restaurants and non-restaurants
+- Yelp vs. TripAdvisor 
+- kNN Model on Attributes
+
+## Overview of Dataset
+- yelp_academic_dataset_business
+- 188592 rows
+- 16 columns
+
+## Central Question
+How can we predict Yelp business star ratings based on business attributes?
+Is there a way to gain higher ratings through intentional inclusion of attributes?
+
+## Distribution of Ratings s
+
+```{r}
+ggplot(businesses, aes(x = stars)) + geom_bar(stat = "count", fill = "chocolate") + 
+  ggtitle("Distribution of Aggregate Ratings of Businesses") +
+  xlab("Ratings") +
+  ylab("Frequency")
+```
+
+
+## Distribution of Businesses Across States
+```{r}
+top10States <- sort(table(businesses$state), decreasing = TRUE)[1:10]
+otherStates <- dim(businesses)[1] - sum(top10States)
+top10States['Others'] <- otherStates
+barplot(as.vector(top10States), names.arg = attr(top10States, "names"), main = "Number of Businesses Per State/Province", xlab = "State/Province", ylab = "Count", col = cbPalette)
+```
+
+
+## Distribution of Review Counts
+
+```{r}
+grid.newpage()
+a <- ggplot(businesses) + aes(x = review_count) + geom_bar(fill = "salmon") + 
+  ggtitle("Distribution of Review Counts") + 
+  xlim(0,100) +
+  xlab("Review Counts") + 
+  ylab("Frequency")
+
+b <- ggplot(businesses, aes(x=review_count, y=stars)) + geom_point(size = 0.3, alpha = 0.1) + ggtitle("Ratings vs. Review Counts") + 
+  xlim(0,300) +
+  xlab("Number of Reviews") + 
+  ylab("Star Rating")
+vpa <- viewport(x = 0.5, y = 0.5, width = 1, height = 1)
+vpb <- viewport(x = 0.70, y = 0.6, width = 0.6, height = 0.6)
+print(a, vp = vpa)
+print(b, vp = vpb)
+
+```
+
+## Average Rating Across Categories
+
+```{r}
+BusiData <- as.data.frame(businesses)
+Categories = c("Food", "Barbers", "Home Services", "Health", "Shopping", "Restaurants", "Nightlife", "Bars")
+Ave_Review = c()
+
+for (index in 1:length(Categories)){
+  Category <- filter(BusiData, str_detect(`categories`, Categories[index]))
+  CategoryAverage <- sum(Category$stars)/nrow(Category)
+  Ave_Review[index] <- CategoryAverage
+}
+
+ggplot(data.frame(Categories), aes(x = Categories, y = Ave_Review, fill = Categories) )+ geom_bar(stat="identity") +  ggtitle("Average Rating Across Categories") +xlab("Categories") + ylab("Average Rating") + theme(axis.text.x = element_text(angle = 35, hjust=1))
+
+```
+
+## Comparison Between Restaurants and Non-Restaurants
+```{r}
+total <- select(businesses, categories, stars)
+restaurantsOnly <- filter(total, str_detect(categories, 'Restaurants'))
+notRestaurants <- setdiff(total, restaurantsOnly)
+
+rest <- ggplot(notRestaurants) + aes(x = stars) + geom_bar(fill = "#ABCDEF") +
+  ggtitle("Distribution of Aggregate Ratings of Non-restaurants") +
+  xlab("Ratings") +
+  ylab("Frequency")
+
+nonrest <- ggplot(restaurantsOnly) + aes(x = stars) + geom_bar(fill = "#FF6666") +
+  ggtitle("Distribution of Aggregate Ratings of Restaurants") +
+  xlab("Ratings") +
+  ylab("Frequency")
+grid.newpage()
+vpr <- viewport(x = 0.5, y = 0.75, width = 1, height = 0.5)
+vpnr <- viewport(x = 0.5, y = 0.25, width = 1, height = 0.5)
+print(rest, vp = vpr)
+print(nonrest, vp = vpnr)
+```
+
+## Average Rating Across States
+```{r}
+stateStars <- select(
+  mutate(businesses,
+         new_state = ifelse(state %in% attr(top10States, "names"),
+                            as.character(state),
+                            "Others")),
+  new_state, stars
+  )
+
+avg_stars <- summarise(
+  group_by(stateStars, new_state),
+  avg_star = mean(stars)
+  )
+
+avg_stars$new_state <- factor(avg_stars$new_state,c("AB","AZ","IL","NC","NV","OH","ON","PA","QC","WI","Others"))
+
+ggplot(avg_stars) +
+  aes(x = new_state, y = avg_star, fill = new_state) +
+  geom_bar(stat = "identity") +
+  ggtitle("Average Ratings across States/Provinces") +
+  xlab("State/Province") +
+  ylab("Average Ratings")
+```
+
+## Yelp vs. TripAdvisor
+Two Word Clouds
+
+## Model
+- kNN Model
+- 20 attributes used to predict star rating of a restaurant
+- Trained data on 80% of data, tested on 20%
+- k = 5 neighbors
+# In simple terms, the k nearest neighbours algorithm is an algorithm that works based on a similarity concept. That is, for any new data point to be predicted based on an existing data set, if the majority of “k” neighbours of the new point belong to a particular class, then the new point also belongs to that class.
+
+## Predicting Using All Attributes
+- Accuracy = 57.58%.
+
+
+## Predicting Using Individual Attributes
+
+
+
+
+
+
+
+
+
+
+## Conclusion
+
